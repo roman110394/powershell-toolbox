@@ -1,0 +1,4 @@
+﻿SamAccountName,GivenName,Surname,MiddleName,Email,Enabled
+i.ivanov,Иван,Иванов,Иванович,i.ivanov@contoso.com,1
+p.petrova,Полина,Петрова,Сергеевна,p.petrova@contoso.com,1
+s.sidorov,Семён,Сидоров,,s.sidorov@contoso.com,0
