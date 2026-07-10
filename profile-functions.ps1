@@ -16,6 +16,8 @@ function Invoke-ToolboxScript {
 }
 
 function healthreport { Invoke-ToolboxScript New-ServerHealthReport @args }
+function fleethealth  { Invoke-ToolboxScript Get-FleetHealth        @args }
+function secbaseline  { Invoke-ToolboxScript Test-SecurityBaseline  @args }
 function scannet      { Invoke-ToolboxScript Scan-Network          @args }
 function adaudit      { Invoke-ToolboxScript Invoke-ADAudit        @args }
 function pwdexpiry    { Invoke-ToolboxScript Send-PasswordExpiryReminder @args }
