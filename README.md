@@ -16,6 +16,10 @@
 
 ![Аудит защищённости Windows](docs/hardening-audit.png)
 
+`Invoke-ADAudit.ps1` — аудит домена (пример на вымышленных данных, `-Demo`):
+
+![Пример аудита Active Directory](docs/ad-audit.png)
+
 `New-ServerHealthReport.ps1` — состояние сервера:
 
 ![Пример HTML-отчёта о состоянии сервера](docs/server-health-report.png)
@@ -25,7 +29,8 @@
 ### Active Directory
 | Скрипт | Что делает |
 |---|---|
-| [Invoke-ADAudit.ps1](Invoke-ADAudit.ps1) | ⭐ Аудит здоровья домена одним запуском → HTML: неактивные учётки, пароли «без срока», лишние админы, заблокированные и просроченные записи, мёртвые компьютеры. Только чтение |
+| [Invoke-ADAudit.ps1](Invoke-ADAudit.ps1) | ⭐ Аудит здоровья домена одним запуском → HTML: неактивные учётки, пароли «без срока», лишние админы, заблокированные и просроченные записи, мёртвые компьютеры. Только чтение. Есть `-Demo` (пример без домена) |
+| [Get-LoginHistory.ps1](Get-LoginHistory.ps1) | Кто и когда входил/выходил (события 4624/4634): тип входа (консоль/RDP/сеть), источник, фильтр по пользователю → таблица / CSV / HTML |
 | [Send-PasswordExpiryReminder.ps1](Send-PasswordExpiryReminder.ps1) | Напоминание о скором истечении пароля AD в Telegram. На планировщик — и пользователи меняют пароль заранее |
 | [New-BulkADUsers.ps1](New-BulkADUsers.ps1) | Массовое создание пользователей AD из CSV + структура OU. Пример данных: [users.sample.csv](users.sample.csv) |
 

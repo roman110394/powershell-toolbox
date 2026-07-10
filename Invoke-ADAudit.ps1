@@ -25,8 +25,16 @@
 .PARAMETER SearchBase
     Ограничить аудит конкретным OU (DistinguishedName). По умолчанию — весь домен.
 
+.PARAMETER Demo
+    Сформировать пример отчёта на вымышленных данных (contoso.local), без обращения
+    к AD. Удобно посмотреть, что делает скрипт, на машине без домена.
+
 .EXAMPLE
     .\Invoke-ADAudit.ps1 -InactiveDays 60
+
+.EXAMPLE
+    .\Invoke-ADAudit.ps1 -Demo
+    Пример отчёта на вымышленных данных.
 
 .NOTES
     Требуется модуль ActiveDirectory (RSAT). Права обычного доменного пользователя
@@ -35,57 +43,95 @@
 param(
     [int]$InactiveDays = 90,
     [string]$ReportPath,
-    [string]$SearchBase
+    [string]$SearchBase,
+    [switch]$Demo   # показать пример отчёта на вымышленных данных, без обращения к AD
 )
 
-Import-Module ActiveDirectory -ErrorAction Stop
+if (-not $Demo) { Import-Module ActiveDirectory -ErrorAction Stop }
 
 if (-not $ReportPath) {
     # $PSScriptRoot пуст при запуске из памяти (irm | iex) — тогда пишем в текущую папку
     $baseDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-    $ReportPath = Join-Path $baseDir ("AD-Audit_{0}.html" -f (Get-Date -Format 'yyyyMMdd'))
+    $suffix = if ($Demo) { 'Demo' } else { Get-Date -Format 'yyyyMMdd' }
+    $ReportPath = Join-Path $baseDir ("AD-Audit_{0}.html" -f $suffix)
 }
 
-$cutoff = (Get-Date).AddDays(-$InactiveDays)
-$base   = @{}
-if ($SearchBase) { $base.SearchBase = $SearchBase }
+if ($Demo) {
+    # --- Демо-данные (вымышленный домен, никаких реальных учёток) ---
+    Write-Host "[*] Демо-режим: отчёт на вымышленных данных (contoso.local)" -ForegroundColor Cyan
+    $domain = 'contoso.local'
+    $inactiveUsers = @(
+        [pscustomobject]@{ Name='Иван Петров'; SamAccountName='i.petrov'; 'Последний вход'=(Get-Date).AddDays(-142) }
+        [pscustomobject]@{ Name='Ольга Смирнова'; SamAccountName='o.smirnova'; 'Последний вход'=(Get-Date).AddDays(-201) }
+        [pscustomobject]@{ Name='Сергей Волков'; SamAccountName='s.volkov'; 'Последний вход'=(Get-Date).AddDays(-97) }
+    )
+    $pwdNeverExpires = @(
+        [pscustomobject]@{ Name='Администратор'; SamAccountName='Administrator' }
+        [pscustomobject]@{ Name='Сервис Бэкапа'; SamAccountName='svc-backup' }
+        [pscustomobject]@{ Name='Пётр Иванов'; SamAccountName='p.ivanov' }
+    )
+    $pwdNotRequired = @(
+        [pscustomobject]@{ Name='Терминал Касса'; SamAccountName='pos-terminal' }
+    )
+    $lockedOut = @(
+        [pscustomobject]@{ Name='Анна Козлова'; SamAccountName='a.kozlova' }
+    )
+    $expired = @(
+        [pscustomobject]@{ Name='Стажёр (уволен)'; SamAccountName='intern2025'; 'Истекла'=(Get-Date).AddDays(-30) }
+    )
+    $privMembers = @(
+        [pscustomobject]@{ 'Группа'='Domain Admins'; 'Участник'='Администратор'; 'Логин'='Administrator'; 'Класс'='user' }
+        [pscustomobject]@{ 'Группа'='Domain Admins'; 'Участник'='Пётр Иванов'; 'Логин'='p.ivanov'; 'Класс'='user' }
+        [pscustomobject]@{ 'Группа'='Enterprise Admins'; 'Участник'='Администратор'; 'Логин'='Administrator'; 'Класс'='user' }
+    )
+    $inactiveComputers = @(
+        [pscustomobject]@{ Name='WKS-042'; OperatingSystem='Windows 10 Pro'; 'Последняя регистрация'=(Get-Date).AddDays(-120) }
+        [pscustomobject]@{ Name='SRV-OLD01'; OperatingSystem='Windows Server 2012 R2'; 'Последняя регистрация'=(Get-Date).AddDays(-380) }
+    )
+} else {
+    $cutoff = (Get-Date).AddDays(-$InactiveDays)
+    $base   = @{}
+    if ($SearchBase) { $base.SearchBase = $SearchBase }
 
-Write-Host "[*] Сбор данных Active Directory (порог неактивности: $InactiveDays дн.)..." -ForegroundColor Cyan
+    Write-Host "[*] Сбор данных Active Directory (порог неактивности: $InactiveDays дн.)..." -ForegroundColor Cyan
 
-# --- Пользователи ---
-$allUsers = Get-ADUser -Filter * -Properties LastLogonDate, PasswordNeverExpires, PasswordNotRequired,
-    Enabled, LockedOut, AccountExpirationDate, whenCreated @base
+    # --- Пользователи ---
+    $allUsers = Get-ADUser -Filter * -Properties LastLogonDate, PasswordNeverExpires, PasswordNotRequired,
+        Enabled, LockedOut, AccountExpirationDate, whenCreated @base
 
-$inactiveUsers = $allUsers | Where-Object {
-    $_.Enabled -and $_.LastLogonDate -and $_.LastLogonDate -lt $cutoff
-} | Select-Object Name, SamAccountName, @{n='Последний вход';e={$_.LastLogonDate}}
+    $inactiveUsers = $allUsers | Where-Object {
+        $_.Enabled -and $_.LastLogonDate -and $_.LastLogonDate -lt $cutoff
+    } | Select-Object Name, SamAccountName, @{n='Последний вход';e={$_.LastLogonDate}}
 
-$pwdNeverExpires = $allUsers | Where-Object { $_.Enabled -and $_.PasswordNeverExpires } |
-    Select-Object Name, SamAccountName
+    $pwdNeverExpires = $allUsers | Where-Object { $_.Enabled -and $_.PasswordNeverExpires } |
+        Select-Object Name, SamAccountName
 
-$pwdNotRequired = $allUsers | Where-Object { $_.Enabled -and $_.PasswordNotRequired } |
-    Select-Object Name, SamAccountName
+    $pwdNotRequired = $allUsers | Where-Object { $_.Enabled -and $_.PasswordNotRequired } |
+        Select-Object Name, SamAccountName
 
-$lockedOut = Search-ADAccount -LockedOut @base |
-    Select-Object Name, SamAccountName
+    $lockedOut = Search-ADAccount -LockedOut @base |
+        Select-Object Name, SamAccountName
 
-$expired = Search-ADAccount -AccountExpired @base | Where-Object { $_.ObjectClass -eq 'user' } |
-    Select-Object Name, SamAccountName, @{n='Истекла';e={$_.AccountExpirationDate}}
+    $expired = Search-ADAccount -AccountExpired @base | Where-Object { $_.ObjectClass -eq 'user' } |
+        Select-Object Name, SamAccountName, @{n='Истекла';e={$_.AccountExpirationDate}}
 
-# --- Привилегированные группы ---
-$privGroups = 'Domain Admins', 'Enterprise Admins', 'Schema Admins', 'Administrators'
-$privMembers = foreach ($g in $privGroups) {
-    try {
-        Get-ADGroupMember -Identity $g -Recursive -ErrorAction Stop | ForEach-Object {
-            [pscustomobject]@{ Группа = $g; Участник = $_.Name; Логин = $_.SamAccountName; Класс = $_.ObjectClass }
-        }
-    } catch {}
+    # --- Привилегированные группы ---
+    $privGroups = 'Domain Admins', 'Enterprise Admins', 'Schema Admins', 'Administrators'
+    $privMembers = foreach ($g in $privGroups) {
+        try {
+            Get-ADGroupMember -Identity $g -Recursive -ErrorAction Stop | ForEach-Object {
+                [pscustomobject]@{ Группа = $g; Участник = $_.Name; Логин = $_.SamAccountName; Класс = $_.ObjectClass }
+            }
+        } catch {}
+    }
+
+    # --- Компьютеры ---
+    $inactiveComputers = Get-ADComputer -Filter * -Properties LastLogonDate, OperatingSystem, Enabled @base |
+        Where-Object { $_.Enabled -and $_.LastLogonDate -and $_.LastLogonDate -lt $cutoff } |
+        Select-Object Name, OperatingSystem, @{n='Последняя регистрация';e={$_.LastLogonDate}}
+
+    $domain = (Get-ADDomain).DNSRoot
 }
-
-# --- Компьютеры ---
-$inactiveComputers = Get-ADComputer -Filter * -Properties LastLogonDate, OperatingSystem, Enabled @base |
-    Where-Object { $_.Enabled -and $_.LastLogonDate -and $_.LastLogonDate -lt $cutoff } |
-    Select-Object Name, OperatingSystem, @{n='Последняя регистрация';e={$_.LastLogonDate}}
 
 # ---------- Формирование HTML ----------
 $style = @"
@@ -118,7 +164,6 @@ function New-Section {
     $html
 }
 
-$domain = (Get-ADDomain).DNSRoot
 $body  = "<h1>Аудит Active Directory — $domain</h1>"
 $body += "<div class='meta'>Сформировано: $(Get-Date -Format 'dd.MM.yyyy HH:mm') · Порог неактивности: $InactiveDays дней</div>"
 $body += New-Section "Неактивные пользователи (вход давнее $InactiveDays дн.)" $inactiveUsers

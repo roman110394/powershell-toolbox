@@ -22,6 +22,7 @@ function secbaseline  { Invoke-ToolboxScript Test-SecurityBaseline  @args }
 function winsetup     { Invoke-ToolboxScript Initialize-Windows     @args }
 function scannet      { Invoke-ToolboxScript Scan-Network          @args }
 function adaudit      { Invoke-ToolboxScript Invoke-ADAudit        @args }
+function loginhistory { Invoke-ToolboxScript Get-LoginHistory     @args }
 function pwdexpiry    { Invoke-ToolboxScript Send-PasswordExpiryReminder @args }
 function cmpfolders   { Invoke-ToolboxScript Compare-FolderTrees   @args }
 function watchsite    { Invoke-ToolboxScript Watch-Site            @args }
