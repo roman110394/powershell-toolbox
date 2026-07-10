@@ -34,11 +34,17 @@
 #>
 param(
     [int]$InactiveDays = 90,
-    [string]$ReportPath = (Join-Path $PSScriptRoot ("AD-Audit_{0}.html" -f (Get-Date -Format 'yyyyMMdd'))),
+    [string]$ReportPath,
     [string]$SearchBase
 )
 
 Import-Module ActiveDirectory -ErrorAction Stop
+
+if (-not $ReportPath) {
+    # $PSScriptRoot пуст при запуске из памяти (irm | iex) — тогда пишем в текущую папку
+    $baseDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+    $ReportPath = Join-Path $baseDir ("AD-Audit_{0}.html" -f (Get-Date -Format 'yyyyMMdd'))
+}
 
 $cutoff = (Get-Date).AddDays(-$InactiveDays)
 $base   = @{}

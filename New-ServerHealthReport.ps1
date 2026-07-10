@@ -40,7 +40,9 @@ param(
 )
 
 if (-not $ReportPath) {
-    $ReportPath = Join-Path $PSScriptRoot ("Health_{0}_{1}.html" -f $ComputerName, (Get-Date -Format 'yyyyMMdd'))
+    # $PSScriptRoot пуст при запуске из памяти (irm | iex) — тогда пишем в текущую папку
+    $baseDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+    $ReportPath = Join-Path $baseDir ("Health_{0}_{1}.html" -f $ComputerName, (Get-Date -Format 'yyyyMMdd'))
 }
 
 $isLocal = $ComputerName -in @($env:COMPUTERNAME, 'localhost', '.', '127.0.0.1')

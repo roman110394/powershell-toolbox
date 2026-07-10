@@ -27,8 +27,14 @@
 param(
     [string]$Subnet = '192.168.1',
     [System.Management.Automation.PSCredential]$Credential,
-    [string]$OutputCsv = (Join-Path $PSScriptRoot 'network-inventory.csv')
+    [string]$OutputCsv
 )
+
+if (-not $OutputCsv) {
+    # $PSScriptRoot пуст при запуске из памяти (irm | iex) — тогда пишем в текущую папку
+    $baseDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+    $OutputCsv = Join-Path $baseDir 'network-inventory.csv'
+}
 
 if (-not $Credential) {
     $Credential = Get-Credential -Message "Учётная запись администратора для опроса Windows-хостов"
