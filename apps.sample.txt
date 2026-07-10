@@ -1,0 +1,14 @@
+﻿# Список программ для установки через winget (Initialize-Windows.ps1 -Apps -AppList apps.sample.txt)
+# По одному winget-ID в строке. Строки с # игнорируются.
+# Найти ID нужной программы: winget search <название>
+
+7zip.7zip
+Mozilla.Firefox
+Notepad++.Notepad++
+VideoLAN.VLC
+Microsoft.PowerToys
+Git.Git
+Microsoft.VisualStudioCode
+Microsoft.PowerShell
+Adobe.Acrobat.Reader.64-bit
+Telegram.TelegramDesktop

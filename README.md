@@ -12,9 +12,9 @@
 Некоторые скрипты формируют самодостаточные HTML-отчёты (без внешних зависимостей —
 открываются где угодно, отправляются почтой).
 
-`Test-SecurityBaseline.ps1` — чеклист безопасности машины:
+`Invoke-WindowsHardeningAudit.ps1` — аудит защищённости с оценкой и рекомендациями:
 
-![Отчёт проверки безопасности](docs/security-baseline.png)
+![Аудит защищённости Windows](docs/hardening-audit.png)
 
 `New-ServerHealthReport.ps1` — состояние сервера:
 
@@ -39,7 +39,13 @@
 ### Безопасность
 | Скрипт | Что делает |
 |---|---|
-| [Test-SecurityBaseline.ps1](Test-SecurityBaseline.ps1) | ⭐ Чеклист гигиены Windows → HTML с вердиктами PASS/WARN/FAIL: SMBv1, RDP+NLA, брандмауэр, BitLocker, LLMNR, UAC, обновления, гостевая учётка, PowerShell v2 |
+| [Invoke-WindowsHardeningAudit.ps1](Invoke-WindowsHardeningAudit.ps1) | ⭐ Глубокий аудит по мотивам CIS Benchmark: ~25 проверок по категориям, итоговая оценка в %, ссылки на разделы CIS и колонка «как исправить» |
+| [Test-SecurityBaseline.ps1](Test-SecurityBaseline.ps1) | Быстрый чеклист гигиены (9 базовых пунктов): SMBv1, RDP+NLA, брандмауэр, BitLocker, LLMNR, UAC, обновления, гостевая учётка, PowerShell v2 |
+
+### Настройка Windows
+| Скрипт | Что делает |
+|---|---|
+| [Initialize-Windows.ps1](Initialize-Windows.ps1) | ⭐ Настройка свежей системы одним запуском: установка софта (winget), деблоат, приватность, твики. По умолчанию сухой прогон — реально применяет только с `-Apply`. Список программ: [apps.sample.txt](apps.sample.txt) |
 
 ### Файлы и мониторинг
 | Скрипт | Что делает |
@@ -60,6 +66,14 @@ Get-Help .\Invoke-ADAudit.ps1 -Full
 Быстрые примеры:
 
 ```powershell
+# Аудит защищённости машины по CIS → HTML с оценкой
+.\Invoke-WindowsHardeningAudit.ps1
+
+# Настроить свежую Windows: сначала посмотреть, что будет сделано...
+.\Initialize-Windows.ps1 -All
+# ...потом применить
+.\Initialize-Windows.ps1 -All -Apply
+
 # Аудит домена → HTML-отчёт (учётка обычного пользователя, только чтение)
 .\Invoke-ADAudit.ps1 -InactiveDays 90
 
