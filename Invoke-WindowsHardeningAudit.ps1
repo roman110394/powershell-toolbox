@@ -3,7 +3,7 @@
     Глубокий аудит защищённости Windows по мотивам CIS Benchmark → HTML + оценка.
 
 .DESCRIPTION
-    Проверяет ~25 настроек безопасности, сгруппированных по категориям
+    Проверяет ~34 настройки безопасности, сгруппированных по категориям
     (учётные записи, сеть и протоколы, поверхность атаки, обновления и аудит),
     и выставляет итоговую оценку в процентах. По каждому пункту — вердикт
     PASS / WARN / FAIL, ссылка на раздел CIS и краткая рекомендация «как исправить».
@@ -105,6 +105,34 @@ $lua = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
 if ($lua -eq 1) { Add-Check $cat 'UAC (контроль учёток)' '2.3.17.1' 'PASS' 'Включён' }
 else { Add-Check $cat 'UAC (контроль учёток)' '2.3.17.1' 'FAIL' 'Отключён' 'EnableLUA=1' }
 
+# UAC: поведение запроса для админов
+$consent = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' 'ConsentPromptBehaviorAdmin'
+if ($null -ne $consent -and $consent -ge 2) { Add-Check $cat 'UAC: запрос для админов' '2.3.17.3' 'PASS' "Запрашивает подтверждение ($consent)" }
+elseif ($consent -eq 0) { Add-Check $cat 'UAC: запрос для админов' '2.3.17.3' 'FAIL' 'Повышение без запроса' 'ConsentPromptBehaviorAdmin=2' }
+else { Add-Check $cat 'UAC: запрос для админов' '2.3.17.3' 'WARN' "Значение $consent — не строгое" 'ConsentPromptBehaviorAdmin=2' }
+
+# Порог блокировки учётной записи
+try {
+    $na2 = net accounts 2>$null
+    $lockLine = $na2 | Select-String 'Lockout threshold|блокировк' | Select-Object -First 1
+    if ($lockLine) {
+        $tok = (($lockLine.ToString() -split ':')[-1]).Trim()
+        if ($tok -match '^\d+$' -and [int]$tok -gt 0) { Add-Check $cat 'Блокировка после неудачных входов' '1.2.2' 'PASS' "$tok попыток" }
+        else { Add-Check $cat 'Блокировка после неудачных входов' '1.2.2' 'FAIL' "Нет порога ($tok) — брутфорс без ограничений" 'net accounts /lockoutthreshold:5' }
+    } else { Add-Check $cat 'Блокировка после неудачных входов' '1.2.2' 'UNKNOWN' 'Не удалось прочитать' }
+} catch { Add-Check $cat 'Блокировка после неудачных входов' '1.2.2' 'UNKNOWN' 'Не удалось прочитать' }
+
+# Анонимное перечисление SAM
+$anonSam = Get-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' 'RestrictAnonymousSAM'
+if ($anonSam -eq 1 -or $null -eq $anonSam) { Add-Check $cat 'Анонимное перечисление учёток' '2.3.10.2' 'PASS' 'Запрещено' }
+else { Add-Check $cat 'Анонимное перечисление учёток' '2.3.10.2' 'FAIL' 'Разрешено — список пользователей утекает анонимно' 'RestrictAnonymousSAM=1' }
+
+# Кэш доменных учёток
+$cached = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' 'CachedLogonsCount'
+if ($null -ne $cached -and [int]$cached -le 4) { Add-Check $cat 'Кэш доменных входов' '2.3.7.x' 'PASS' "$cached (немного)" }
+elseif ($null -eq $cached) { Add-Check $cat 'Кэш доменных входов' '2.3.7.x' 'WARN' 'Не задано (по умолчанию 10)' 'CachedLogonsCount=4' }
+else { Add-Check $cat 'Кэш доменных входов' '2.3.7.x' 'WARN' "$cached кэшируется — риск офлайн-подбора" 'CachedLogonsCount=4' }
+
 # ==================== СЕТЬ И ПРОТОКОЛЫ ====================
 $cat = 'Сеть и протоколы'
 
@@ -139,6 +167,23 @@ try {
     if ($off.Count -eq 0) { Add-Check $cat 'Брандмауэр' '9.x' 'PASS' 'Включён по всем профилям' }
     else { Add-Check $cat 'Брандмауэр' '9.x' 'FAIL' ("Выключен: " + ($off.Name -join ', ')) 'Включить Windows Firewall для всех профилей' }
 } catch { Add-Check $cat 'Брандмауэр' '9.x' 'UNKNOWN' 'Не удалось проверить' }
+
+# Брандмауэр: входящие по умолчанию блокируются
+try {
+    $allow = @(Get-NetFirewallProfile -EA Stop | Where-Object { $_.DefaultInboundAction -eq 'Allow' })
+    if ($allow.Count -eq 0) { Add-Check $cat 'Брандмауэр: входящие по умолчанию' '9.x' 'PASS' 'Блокируются' }
+    else { Add-Check $cat 'Брандмауэр: входящие по умолчанию' '9.x' 'FAIL' ("Разрешены: " + ($allow.Name -join ', ')) 'DefaultInboundAction = Block' }
+} catch { Add-Check $cat 'Брандмауэр: входящие по умолчанию' '9.x' 'UNKNOWN' 'Не удалось проверить' }
+
+# Подпись SMB (клиент)
+$smbSignCli = Get-Reg 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters' 'RequireSecuritySignature'
+if ($smbSignCli -eq 1) { Add-Check $cat 'Подпись SMB (клиент)' '2.3.8.1' 'PASS' 'Обязательна' }
+else { Add-Check $cat 'Подпись SMB (клиент)' '2.3.8.1' 'WARN' 'Не обязательна' 'RequireSecuritySignature=1 (LanmanWorkstation)' }
+
+# WDigest — пароли открытым текстом в памяти
+$wdigest = Get-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest' 'UseLogonCredential'
+if ($wdigest -eq 0 -or $null -eq $wdigest) { Add-Check $cat 'WDigest (пароли в памяти)' '18.x' 'PASS' 'Открытые пароли не кэшируются' }
+else { Add-Check $cat 'WDigest (пароли в памяти)' '18.x' 'FAIL' 'Пароли лежат в памяти открытым текстом (Mimikatz)' 'UseLogonCredential=0' }
 
 # ==================== ПОВЕРХНОСТЬ АТАКИ ====================
 $cat = 'Поверхность атаки'
@@ -175,6 +220,30 @@ try {
     else { Add-Check $cat 'BitLocker (системный диск)' '18.9.11.x' 'WARN' 'Не зашифрован' 'Включить BitLocker на системном диске' }
 } catch { Add-Check $cat 'BitLocker (системный диск)' '18.9.11.x' 'UNKNOWN' 'Недоступно (нет прав/роли)' }
 
+# Windows Script Host (.vbs/.js)
+$wsh = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows Script Host\Settings' 'Enabled'
+if ($wsh -eq 0) { Add-Check $cat 'Windows Script Host' '—' 'PASS' 'Отключён (.vbs/.js не запускаются)' }
+else { Add-Check $cat 'Windows Script Host' '—' 'WARN' 'Включён — вектор запуска .vbs/.js из вложений' 'HKLM\...\Windows Script Host\Settings Enabled=0' }
+
+# Автозапуск с носителей без тома (сеть/образы)
+$autoNonVol = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoAutoplayfornonVolume'
+if ($autoNonVol -eq 1) { Add-Check $cat 'AutoPlay (сеть/образы)' '18.9.8.2' 'PASS' 'Отключён' }
+else { Add-Check $cat 'AutoPlay (сеть/образы)' '18.9.8.2' 'WARN' 'Включён' 'NoAutoplayfornonVolume=1' }
+
+# Credential Guard
+try {
+    $dg = Get-CimInstance -ClassName Win32_DeviceGuard -Namespace 'root\Microsoft\Windows\DeviceGuard' -EA Stop
+    if ($dg.SecurityServicesRunning -contains 1) { Add-Check $cat 'Credential Guard' '18.9.x' 'PASS' 'Работает (защита LSASS)' }
+    else { Add-Check $cat 'Credential Guard' '18.9.x' 'WARN' 'Не запущен — учётные данные уязвимы к дампу LSASS' 'Включить Credential Guard (нужен UEFI+VBS)' }
+} catch { Add-Check $cat 'Credential Guard' '18.9.x' 'UNKNOWN' 'Не поддерживается / нет данных' }
+
+# Defender: правила ASR
+try {
+    $asr = (Get-MpPreference -EA Stop).AttackSurfaceReductionRules_Ids
+    if ($asr -and @($asr).Count -gt 0) { Add-Check $cat 'Defender: правила ASR' '18.9.47.x' 'PASS' "Настроено правил: $(@($asr).Count)" }
+    else { Add-Check $cat 'Defender: правила ASR' '18.9.47.x' 'WARN' 'Не настроены — не блокируются типовые техники атак' 'Настроить Attack Surface Reduction rules' }
+} catch { Add-Check $cat 'Defender: правила ASR' '18.9.47.x' 'UNKNOWN' 'Недоступно' }
+
 # ==================== ОБНОВЛЕНИЯ И АУДИТ ====================
 $cat = 'Обновления и аудит'
 
@@ -197,6 +266,17 @@ else { Add-Check $cat 'PowerShell: логирование блоков' '18.9.10
 $cmdAudit = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit' 'ProcessCreationIncludeCmdLine_Enabled'
 if ($cmdAudit -eq 1) { Add-Check $cat 'Аудит: командная строка процессов' '18.9.3.x' 'PASS' 'Включён' }
 else { Add-Check $cat 'Аудит: командная строка процессов' '18.9.3.x' 'WARN' 'Выключен — в логах не видно аргументов запуска' 'GPO: Include command line in process creation events' }
+
+# PowerShell: логирование модулей
+$modLog = Get-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging' 'EnableModuleLogging'
+if ($modLog -eq 1) { Add-Check $cat 'PowerShell: логирование модулей' '18.9.100.x' 'PASS' 'Включено' }
+else { Add-Check $cat 'PowerShell: логирование модулей' '18.9.100.x' 'WARN' 'Выключено' 'GPO: Turn on Module Logging' }
+
+# Блокировка экрана по простою
+$idle = Get-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' 'InactivityTimeoutSecs'
+if ($null -ne $idle -and [int]$idle -gt 0 -and [int]$idle -le 900) { Add-Check $cat 'Блокировка экрана по простою' '2.3.7.3' 'PASS' "$idle сек" }
+elseif ($null -eq $idle -or [int]$idle -eq 0) { Add-Check $cat 'Блокировка экрана по простою' '2.3.7.3' 'WARN' 'Не задана — экран не блокируется сам' 'InactivityTimeoutSecs=900 (15 мин)' }
+else { Add-Check $cat 'Блокировка экрана по простою' '2.3.7.3' 'WARN' "$idle сек — долго" 'InactivityTimeoutSecs ≤ 900' }
 
 # ==================== КОНСОЛЬ ====================
 $color = @{ PASS = 'Green'; WARN = 'Yellow'; FAIL = 'Red'; UNKNOWN = 'DarkGray' }

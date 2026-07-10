@@ -39,7 +39,7 @@
 ### Безопасность
 | Скрипт | Что делает |
 |---|---|
-| [Invoke-WindowsHardeningAudit.ps1](Invoke-WindowsHardeningAudit.ps1) | ⭐ Глубокий аудит по мотивам CIS Benchmark: ~25 проверок по категориям, итоговая оценка в %, ссылки на разделы CIS и колонка «как исправить» |
+| [Invoke-WindowsHardeningAudit.ps1](Invoke-WindowsHardeningAudit.ps1) | ⭐ Глубокий аудит по мотивам CIS Benchmark: ~34 проверки по категориям, итоговая оценка в %, ссылки на разделы CIS и колонка «как исправить» |
 | [Test-SecurityBaseline.ps1](Test-SecurityBaseline.ps1) | Быстрый чеклист гигиены (9 базовых пунктов): SMBv1, RDP+NLA, брандмауэр, BitLocker, LLMNR, UAC, обновления, гостевая учётка, PowerShell v2 |
 
 ### Настройка Windows
