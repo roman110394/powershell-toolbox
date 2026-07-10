@@ -35,7 +35,7 @@
     Все серверы из AD, текущая учётка.
 
 .EXAMPLE
-    .\Get-FleetHealth.ps1 -ComputerName DC-01, FS-01, 1C-01 -UptimeWarnDays 90
+    .\Get-FleetHealth.ps1 -ComputerName SRV-DC01, SRV-FS01, SRV-APP01 -UptimeWarnDays 90
 
 .NOTES
     Для автосписка нужен модуль ActiveDirectory (RSAT); при явном -ComputerName
