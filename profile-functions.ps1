@@ -1,4 +1,4 @@
-﻿# ── PowerShell Toolbox: короткие команды для запуска скриптов из GitHub ──
+# ── PowerShell Toolbox: короткие команды для запуска скриптов из GitHub ──
 # Один раз добавьте это в свой профиль (см. инструкцию в README), и запускайте словом:
 #   healthreport
 #   scannet -Subnet 192.168.1
@@ -7,10 +7,11 @@
 $ToolboxBase = 'https://raw.githubusercontent.com/roman110394/powershell-toolbox/main'
 
 function Invoke-ToolboxScript {
-    param([Parameter(Mandatory)][string]$Name)
-    $rest = $args   # всё, что после имени скрипта, — пробрасываем как есть
+    # без param() — чтобы -ParamName аргументы уходили в целевой скрипт, а не сюда
+    $name = $args[0]
+    $rest = if ($args.Count -gt 1) { $args[1..($args.Count - 1)] } else { @() }
     [Net.ServicePointManager]::SecurityProtocol = 'Tls12'
-    $code = (Invoke-RestMethod "$ToolboxBase/$Name.ps1").TrimStart([char]0xFEFF)
+    $code = (Invoke-RestMethod "$ToolboxBase/$name.ps1").TrimStart([char]0xFEFF)
     & ([scriptblock]::Create($code)) @rest
 }
 

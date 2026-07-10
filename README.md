@@ -64,6 +64,52 @@ Get-Help .\Invoke-ADAudit.ps1 -Full
 .\Compare-FolderTrees.ps1 -PathA C:\CloudCopy -PathB S:\Archive -CompareFiles -ReportPath .\diff.txt
 ```
 
+## Запуск прямо из GitHub (без скачивания)
+
+Так как репозиторий публичный, скрипты можно выполнить из памяти. На Windows
+PowerShell 5.1 сначала включите TLS 1.2 (один раз за сессию):
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = 'Tls12'
+```
+
+**Без параметров** (файлы в кодировке UTF-8 с BOM, поэтому BOM-символ убираем):
+
+```powershell
+(irm https://raw.githubusercontent.com/roman110394/powershell-toolbox/main/New-ServerHealthReport.ps1).TrimStart([char]0xFEFF) | iex
+```
+
+**С параметрами** — через scriptblock:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/roman110394/powershell-toolbox/main/Scan-Network.ps1).TrimStart([char]0xFEFF))) -Subnet 192.168.1
+```
+
+### Короткие команды (рекомендуется)
+
+Чтобы не помнить длинные URL — добавьте [profile-functions.ps1](profile-functions.ps1)
+в свой профиль PowerShell один раз:
+
+```powershell
+# посмотреть путь профиля и создать файл, если его нет
+if (-not (Test-Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force }
+notepad $PROFILE
+```
+
+Вставьте содержимое `profile-functions.ps1`, сохраните, откройте новое окно
+PowerShell — и запускайте словом:
+
+```powershell
+healthreport                       # отчёт по текущей машине
+healthreport -ComputerName SRV-01  # по удалённой
+scannet -Subnet 192.168.1          # инвентаризация подсети
+adaudit -InactiveDays 60           # аудит домена
+```
+
+> ⚠️ `irm | iex` выполняет код из интернета. Для **своего** репозитория это
+> нормально (вы знаете, что внутри), но не привыкайте запускать так чужие скрипты.
+> При работе из РФ `raw.githubusercontent.com` может быть недоступен без VPN.
+
 ## Принципы
 
 - **Никаких секретов в коде** — пароли и токены только через параметры,
